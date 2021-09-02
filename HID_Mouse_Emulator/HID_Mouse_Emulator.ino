@@ -1,14 +1,14 @@
 /* * * * * * * * * * * * * * * * * * */
-/*        Emulator miša V1.2.2       */
+/*          HID Foot Mouse           */
 /*        by Daniel Đuranović        */
-/*           siječanj 2021.          */
+/*           Kolovoz 2021.           */
 /* * * * * * * * * * * * * * * * * * */
 
 #include <USBComposite.h>
 #include <EEPROM.h>
 
 /*DEVICE INFO*/
-const char ManufacturerName[] = "Homemade";
+const char ManufacturerName[] = "Dani's Thinkering";
 const char DeviceName[] = "HID Foot Mouse";
 const char DeviceSerial[] = "00000000000000000001";
 
@@ -16,41 +16,45 @@ const char DeviceSerial[] = "00000000000000000001";
 #define EEPROM_ADDR_VERSION_DATE 0x0
 #define EEPROM_ADD_START_OF_DATA 0x13 //Data se sprema od ove adrese nadalje
 
-/*Mouse*/
-#define upButton PB12
+/*Mouse Pin Definition*/
+#define upButton PB11
 #define downButton PB13
 #define leftButton PB14
 #define rightButton PB15
 #define mouseButton PA8
 
-/*Encoder*/
-#define encA PA11
-#define encB PA12
-#define encSwitch PA15
-#define statusLED PC13
+/*Encoder Definition*/
+#define encA PA1
+#define encB PA2
+#define encSwitch PA0
+#define statusLED PA7
 
-boolean goingUp, goingDown = false;
-boolean encSwitchValue, encSwitchOldValue = true;
-boolean encSwitchState = false;
+int seqA, seqB;
+boolean right, left;
+boolean encSwitchValue;
+boolean  encSwitchOldValue = true;
+boolean encSwitchState;
 
 /* Za Mouse speed (0-127)*/
-int counter = 0;     //Spremljena u EEPROM(0x14)
+int counter = 1;     //Spremljena u EEPROM(0x14)
 
 /*Milis*/
-const long interval = 50;
-unsigned long previousMillis = 0; 
+const long interval = 100;
+unsigned long previousMillis; 
 
 /*Button State/time var*/
 int upState, downState,leftState, rightState, mouseState = 0;   
 const int short_press_time = 100;                        
 unsigned long endUP_time, buildUP_time, hold_time;
 
-/*HID Definiranje*/
+/*HID Definition*/
 USBHID HID;
 //HIDKeyboard Keyboard(HID);
 HIDMouse Mouse(HID); 
 
+/*SETUP*/
 void setup() {
+  
   /*Boota li se prvi put?*/
   if(first_boot_check()) EEPROM.write(0x14, counter);
 
@@ -61,7 +65,8 @@ void setup() {
   USBComposite.setManufacturerString(ManufacturerName);
   USBComposite.setProductString(DeviceName);
   USBComposite.setSerialString(DeviceSerial);
-  
+
+  /*Begin HID*/
   HID.begin(HID_KEYBOARD_MOUSE);
   while(!USBComposite);
 
@@ -71,18 +76,31 @@ void setup() {
   pinMode(leftButton, INPUT);
   pinMode(rightButton, INPUT);
   pinMode(mouseButton,INPUT);
-  pinMode(encA, INPUT);
-  pinMode(encB, INPUT);
-  pinMode(encSwitch, INPUT); 
+
+
+  /*Define Encoder Pins*/
+  pinMode(encSwitch, INPUT_PULLUP);
+  pinMode(encA, INPUT_PULLUP);
+  pinMode(encB, INPUT_PULLUP);
   pinMode(statusLED, OUTPUT);
 
-  /*Pinu A encodera dodjeljenja interupt (ISR)*/
-  attachInterrupt(digitalPinToInterrupt(encA), isr_enc_decode, FALLING); //Falling edge (HIGH -> LOW)
+  /*Attach Interupt to encoder pins*/
+  attachInterrupt(digitalPinToInterrupt(encSwitch), ISR, CHANGE); //ISR-> Definirana interupt fja, CHANGE mode -> svaki put kad pin promjeni stanje
+  attachInterrupt(digitalPinToInterrupt(encA), ISR, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(encB), ISR, CHANGE);
   
+  /*Status variables*/ 
+  encSwitchState = false;
+
+
+  /*Time variables*/
   endUP_time, buildUP_time, hold_time = 0; 
+  previousMillis = 0;
 }
 
+/*LOOP*/
 void loop() {
+  
      unsigned long currentMillis = millis();
  
      if(currentMillis - previousMillis >= interval) {    
@@ -100,10 +118,16 @@ void loop() {
       
     /* poprimi li distance neku vrijednost pomakni mis*/
     if((xDistance != 0) || (yDistance != 0)){    
+       
        hold_time = buildUP_time - endUP_time;     //koliko dugo traje pritisak?
-       if(hold_time <= short_press_time ) Mouse.move(xDistance*3, yDistance*3, 0); //Kratak click pomakne mis za 3 piksela
-       else Mouse.move(xDistance*mouseRange, yDistance*mouseRange, 0);
+       if(hold_time <= short_press_time) {
+        Mouse.move(xDistance, yDistance, 0); //Kratak click pomakne mis za 1 piksel
+       }
+       else{
+        Mouse.move(xDistance*mouseRange, yDistance*mouseRange, 0);
+       } 
     }
+    
     /*detektiranje ako je pritisnuta tipka misa*/
     if(mouseState == HIGH){
         if(!Mouse.isPressed(MOUSE_LEFT)) Mouse.press(MOUSE_LEFT);     
@@ -115,22 +139,20 @@ void loop() {
     
   
    /*Encoder*/
-   encSwitchValue = digitalRead(encSwitch);
-   if((encSwitchValue == LOW) && (encSwitchOldValue == HIGH)) encSwitchState = 1 - encSwitchState;
+   if((encSwitchValue == true) && (encSwitchOldValue == false)){
+    encSwitchState = 1 - encSwitchState;
+   }
    encSwitchOldValue = encSwitchValue;
 
-   /*Obrnuta logika (inace LOW)*/
    if(encSwitchState == HIGH){
-      while(goingUp == 1){
-          goingUp = 0;
+     if(right == true){
           counter++;
           if(counter > 16) counter = 16;  
       }
 
-      while(goingDown == 1){
-          goingDown = 0;
+      else if(left == true){
           counter--;
-          if(counter < 0) counter = 0;
+          if(counter < 1) counter = 1;
       }
       
   digitalWrite(statusLED, HIGH);
@@ -148,9 +170,48 @@ void loop() {
 
 
 /*Encoder interupt (ISR) fja*/
-void isr_enc_decode(){
-  if(digitalRead(encA) == digitalRead(encB)) goingUp = 1;     //Smjer kazaljke na satu
-  else goingDown = 1;                                         //Obrnuto od kazaljke na satu
+void ISR(){
+  
+
+// If interrupt is triggered by the button
+  if (!digitalRead(encSwitch)) {
+    
+    encSwitchValue = true;
+    left, right = false;
+  }
+
+// Else if interrupt is triggered by encoder signals
+  else {
+    
+    // Read A and B signals
+    boolean A_val = digitalRead(encA);
+    boolean B_val = digitalRead(encB);
+    
+    // Record the A and B signals in seperate sequences
+    seqA <<= 1;
+    seqA |= A_val;
+    
+    seqB <<= 1;
+    seqB |= B_val;
+    
+    // Mask the MSB four bits
+    seqA &= 0b00001111;
+    seqB &= 0b00001111;
+    
+    // Compare the recorded sequence with the expected sequence
+    if (seqA == 0b00001001 && seqB == 0b00000011) {
+      left = true;
+      right = false;
+      }
+     
+    else if (seqA == 0b00000011 && seqB == 0b00001001) {
+      right = true;
+      left = false;
+      }
+
+      encSwitchValue = false;  
+  }
+
 }
 
 /*Provjera prvoog bootanja*/
@@ -172,7 +233,7 @@ boolean first_boot_check(){
 }
 
 void readState(){
-    upState = digitalRead(upButton);
+    upState = digitalRead(upButton); 
     downState = digitalRead(downButton);
     rightState = digitalRead(rightButton);
     leftState = digitalRead(leftButton);
@@ -180,6 +241,10 @@ void readState(){
 }
 
 boolean checkState(){
-  if((upState == HIGH) || (downState == HIGH) || (leftState == HIGH) || (rightState == HIGH)) return 1;
-  else return 0;
+  if((upState == HIGH) || (downState == HIGH) || (leftState == HIGH) || (rightState == HIGH)){ 
+  return 1;
+  }
+  else{ 
+  return 0;
+}
 }
