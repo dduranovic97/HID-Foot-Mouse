@@ -44,8 +44,8 @@ unsigned long previousMillis;
 
 /*Button State/time var*/
 int upState, downState,leftState, rightState, mouseState = 0;   
-const int short_press_time = 100;                        
-unsigned long endUP_time, buildUP_time, hold_time;
+const int short_press_time = 100; //WIP                  
+unsigned long endUP_time, buildUP_time, hold_time; //WIP
 
 /*HID Definition*/
 USBHID HID;
@@ -97,8 +97,7 @@ void setup() {
   endUP_time, buildUP_time, hold_time = 0; 
   previousMillis = 0;
 
-  Serial.begin(115200);
-  delay(1000); //Da se ne triggera interupt i upali program mode
+  delay(1000); //Da se ne triggera interupt cim se spoji na USB Port
 }
 
 /*LOOP*/
@@ -112,13 +111,9 @@ void loop() {
         previousMillis = currentMillis;
      }
 
-     /*-----------------------------------------------*/
-     /*Click press timing*/
+     /*Click press timing - WIP*/
      if(checkState()) buildUP_time = millis();
      else endUP_time = millis();
-     
-     /*-----------------------------------------------*/
-     
           
     /*Racunanje udaljenosti*/ 
     int mouseRange = map(counter, 1, 128, 1, 10);
@@ -149,23 +144,18 @@ void loop() {
 
    if(encSwitchState == HIGH){
      if(right == true){
-          right = false;
-          counter++;
-          if(counter > 128) counter = 128;
-          Serial.print(counter);
-          Serial.print("/");
-          Serial.print(mouseRange);    
-          Serial.print("\n");  
+          right = false; //Sprijecava da se counter poveca u beskonacnost jednim okretom
+          counter++; 
+          if(counter > 128) counter = 128;  
       }
 
       else if(left == true){
-          left = false;
+          left = false; //Sprijecava da se counter smanjuje u beskonacnost jednim okretom
           counter--;
-          if(counter < 1) counter = 1;
+          if(counter < 1) counter = 1;  
       }
       
   digitalWrite(statusLED, HIGH);
-  
   }
   
   else{
@@ -173,24 +163,21 @@ void loop() {
      EEPROM.write(0x14, counter);
   }
     
-
 /*End of loop*/
 } 
-
-
 
 /*Encoder interupt (ISR) fja*/
 void ISR(){
   
 
-// If interrupt is triggered by the button
+// Interupt triggeran preko switch-a
   if (!digitalRead(encSwitch)) {
     
     encSwitchValue = true;
     left, right = false;
   }
 
-// Else if interrupt is triggered by encoder signals
+// Interupt triggeran preko encA ili encB
   else {
     
     // Read A and B signals
