@@ -17,17 +17,17 @@ const char DeviceSerial[] = "00000000000000000001";
 #define EEPROM_ADD_START_OF_DATA 0x13 //Data se sprema od ove adrese nadalje
 
 /*Mouse Pin Definition*/
-#define upButton PB11
+#define upButton PB12
 #define downButton PB13
-#define leftButton PB14
-#define rightButton PB15
-#define mouseButton PA8
+#define leftButton PB11
+#define rightButton PB10
+#define mouseButton PB14
 
 /*Encoder Definition*/
 #define encA PA1
 #define encB PA2
 #define encSwitch PA0
-#define statusLED PA7
+#define statusLED PC15
 
 int seqA, seqB;
 boolean right, left;
