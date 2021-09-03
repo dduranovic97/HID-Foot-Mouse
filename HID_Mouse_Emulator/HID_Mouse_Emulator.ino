@@ -96,6 +96,9 @@ void setup() {
   /*Time variables*/
   endUP_time, buildUP_time, hold_time = 0; 
   previousMillis = 0;
+
+  Serial.begin(115200);
+  delay(1000); //Da se ne triggera interupt i upali program mode
 }
 
 /*LOOP*/
@@ -108,27 +111,27 @@ void loop() {
         readState();
         previousMillis = currentMillis;
      }
+
+     /*-----------------------------------------------*/
+     /*Click press timing*/
      if(checkState()) buildUP_time = millis();
      else endUP_time = millis();
      
+     /*-----------------------------------------------*/
+     
+          
     /*Racunanje udaljenosti*/ 
-    int mouseRange = counter; //map(counter, 0, 16, 1, 16);
+    int mouseRange = map(counter, 1, 128, 1, 10);
     int xDistance = (rightState - leftState);
     int yDistance = (downState - upState);
+
       
     /* poprimi li distance neku vrijednost pomakni mis*/
     if((xDistance != 0) || (yDistance != 0)){    
-       
-       hold_time = buildUP_time - endUP_time;     //koliko dugo traje pritisak?
-       if(hold_time <= short_press_time) {
-        Mouse.move(xDistance, yDistance, 0); //Kratak click pomakne mis za 1 piksel
-       }
-       else{
         Mouse.move(xDistance*mouseRange, yDistance*mouseRange, 0);
        } 
-    }
     
-    /*detektiranje ako je pritisnuta tipka misa*/
+    /*detektiranje ako je pritisnuta lijevi klik misa*/
     if(mouseState == HIGH){
         if(!Mouse.isPressed(MOUSE_LEFT)) Mouse.press(MOUSE_LEFT);     
      }
@@ -146,16 +149,23 @@ void loop() {
 
    if(encSwitchState == HIGH){
      if(right == true){
+          right = false;
           counter++;
-          if(counter > 16) counter = 16;  
+          if(counter > 128) counter = 128;
+          Serial.print(counter);
+          Serial.print("/");
+          Serial.print(mouseRange);    
+          Serial.print("\n");  
       }
 
       else if(left == true){
+          left = false;
           counter--;
           if(counter < 1) counter = 1;
       }
       
   digitalWrite(statusLED, HIGH);
+  
   }
   
   else{
@@ -163,7 +173,7 @@ void loop() {
      EEPROM.write(0x14, counter);
   }
     
-     
+
 /*End of loop*/
 } 
 
@@ -232,6 +242,7 @@ boolean first_boot_check(){
     return is_ipl;
 }
 
+/*Gleda jeli koji taster pritisnut (samo je kompaktniji kod)*/
 void readState(){
     upState = digitalRead(upButton); 
     downState = digitalRead(downButton);
@@ -240,11 +251,12 @@ void readState(){
     mouseState = digitalRead(mouseButton);
 }
 
+/*Ako je bilo koji state aktivan, vraca true*/
 boolean checkState(){
   if((upState == HIGH) || (downState == HIGH) || (leftState == HIGH) || (rightState == HIGH)){ 
-  return 1;
+    return 1;
   }
   else{ 
-  return 0;
-}
+    return 0;
+  }
 }
