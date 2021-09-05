@@ -27,7 +27,7 @@ const char DeviceSerial[] = "00000000000000000001";
 #define encA PA1
 #define encB PA2
 #define encSwitch PA0
-#define statusLED PC15
+#define statusLED PA3
 
 int seqA, seqB;
 boolean right, left;
