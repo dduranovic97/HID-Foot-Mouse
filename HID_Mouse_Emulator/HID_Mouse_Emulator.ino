@@ -116,7 +116,7 @@ void loop() {
      else endUP_time = millis();
           
     /*Racunanje udaljenosti*/ 
-    int mouseRange = map(counter, 1, 128, 1, 10);
+    int mouseRange = map(counter, 1, 64, 1, 10);
     int xDistance = (rightState - leftState);
     int yDistance = (downState - upState);
 
@@ -146,7 +146,7 @@ void loop() {
      if(right == true){
           right = false; //Sprijecava da se counter poveca u beskonacnost jednim okretom
           counter++; 
-          if(counter > 128) counter = 128;  
+          if(counter > 64) counter = 64; 
       }
 
       else if(left == true){
